@@ -1,4 +1,4 @@
-# MK Educator
+# Mahibere Kidusan Educator
 
 A classroom presentation and quiz tool for substitute teachers and volunteers. When a teacher is absent, any volunteer can log in, pick a topic, present content slides to students, run quizzes, and award stars.
 

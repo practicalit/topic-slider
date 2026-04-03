@@ -12,7 +12,7 @@ export default async function HomePage() {
     <div className="max-w-4xl mx-auto px-4 py-12">
       <div className="text-center mb-12">
         <h1 className="text-4xl font-bold text-gray-900 mb-4">
-          Welcome to MK Educator
+          Welcome to Mahibere Kidusan - ማህበረ ቅዱሳን
         </h1>
         <p className="text-lg text-gray-600">
           Classroom presentation and quiz tool for substitute teachers and volunteers

@@ -3,6 +3,7 @@
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState, FormEvent } from "react";
+import { FloatingQuotes } from "@/components/floating-quotes";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -32,10 +33,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600">
-      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600 relative">
+      <FloatingQuotes />
+      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md relative z-10">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">📚 MK Educator</h1>
+          <h1 className="text-3xl font-bold text-gray-900">✝️ ማህበረ ቅዱሳን</h1>
           <p className="text-gray-500 mt-2">Sign in to continue</p>
         </div>
 

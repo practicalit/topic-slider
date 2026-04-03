@@ -25,7 +25,7 @@ export function NavBar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-1">
-            <span className="text-xl font-bold mr-6">📚 MK Educator</span>
+            <span className="text-xl font-bold mr-6">✝️ ማህበረ ቅዱሳን</span>
             <div className="flex gap-1">
               {links.map((link) => (
                 <Link

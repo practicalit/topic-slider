@@ -80,3 +80,11 @@ model Star {
   @@unique([studentId, topicId])
   @@index([studentId])
 }
+
+model Quote {
+  id          String @id @default(cuid())
+  quote       String // the quote text (Amharic or English)
+  reference   String // e.g. "ዮሐንስ 3:16"
+  category    String // e.g. "hope", "happiness", "resilience"
+  createdAt   DateTime @default(now())
+}

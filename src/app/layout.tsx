@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MK Educator",
+  title: "Mahibere Kidusan - ማህበረ ቅዱሳን",
   description: "Classroom presentation and quiz tool for substitute teachers",
 };
 
