@@ -101,13 +101,13 @@ export default function PresentTopicPage() {
       </div>
 
       {/* Slide Content */}
-      <div className="flex-1 flex items-center justify-center px-4 py-8">
-        <div className="max-w-3xl w-full">
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 md:p-12 min-h-[400px] flex flex-col justify-center">
-            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-6">
+      <div className="flex-1 overflow-y-auto px-4 py-8">
+        <div className="max-w-3xl w-full mx-auto">
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 md:p-14 min-h-[400px]">
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-8">
               {slides[currentSlide].title}
             </h2>
-            <div className="prose prose-lg max-w-none text-gray-700">
+            <div className="prose prose-lg max-w-none text-gray-700 leading-relaxed prose-p:my-4 prose-headings:mt-8 prose-headings:mb-4 prose-li:my-1.5 prose-blockquote:my-5 prose-ul:my-4 prose-ol:my-4 prose-table:my-6 prose-hr:my-6">
               <ReactMarkdown
                 components={{
                   img: ({ ...props }) => (
