@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import ReactMarkdown from "react-markdown";
 
 interface Content {
   id: string;
@@ -106,8 +107,16 @@ export default function PresentTopicPage() {
             <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-6">
               {slides[currentSlide].title}
             </h2>
-            <div className="text-gray-700 text-lg leading-relaxed whitespace-pre-wrap">
-              {slides[currentSlide].body}
+            <div className="prose prose-lg max-w-none text-gray-700">
+              <ReactMarkdown
+                components={{
+                  img: ({ ...props }) => (
+                    <img {...props} className="rounded-xl mx-auto max-h-64 object-contain" />
+                  ),
+                }}
+              >
+                {slides[currentSlide].body}
+              </ReactMarkdown>
             </div>
           </div>
         </div>
