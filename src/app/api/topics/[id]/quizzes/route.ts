@@ -1,26 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
+import { auditForSessionFireAndForget } from "@/lib/audit-log";
+import { touchTopicUpdatedBy } from "@/lib/topic-touch";
+import {
+  forbidSuperAdminSchoolWrite,
+  requireAdmin,
+  requireAuth,
+  requireAuthForSchool,
+  getTopicForSchoolRead,
+  getTopicInTenant,
+  type ScopedSession,
+} from "@/lib/scope";
 
 type Params = { params: Promise<{ id: string }> };
 
-// GET /api/topics/:id/quizzes
 export async function GET(_req: NextRequest, { params }: Params) {
+  const authz = await requireAuthForSchool();
+  if (!authz.ok) return authz.res;
+
   const { id } = await params;
+  const topic = await getTopicForSchoolRead(authz.session, id);
+  if (!topic) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const quizzes = await prisma.quiz.findMany({
     where: { topicId: id },
   });
   return NextResponse.json(quizzes);
 }
 
-// POST /api/topics/:id/quizzes (admin only)
 export async function POST(req: NextRequest, { params }: Params) {
-  const session = await auth();
-  if (!session || session.user.role !== "ADMIN") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  }
+  const authz = await requireAuth();
+  if (!authz.ok) return authz.res;
+  const readOnly = forbidSuperAdminSchoolWrite(authz.session);
+  if (readOnly) return readOnly;
+  const forbidden = requireAdmin(authz.session);
+  if (forbidden) return forbidden;
 
   const { id } = await params;
+  const topic = await getTopicInTenant(authz.session.user.tenantId, id);
+  if (!topic) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const body = await req.json();
   const { question, options, answer } = body;
 
@@ -46,5 +69,16 @@ export async function POST(req: NextRequest, { params }: Params) {
       answer,
     },
   });
+
+  const uid = authz.session.user.id;
+  await touchTopicUpdatedBy(id, uid);
+  auditForSessionFireAndForget(authz.session as ScopedSession, {
+    action: "QUIZ_CREATE",
+    entityType: "Quiz",
+    entityId: quiz.id,
+    summary: `Added quiz question to topic`,
+    metadata: { topicId: id, question: quiz.question.slice(0, 120) },
+  });
+
   return NextResponse.json(quiz, { status: 201 });
 }

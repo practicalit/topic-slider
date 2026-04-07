@@ -5,6 +5,12 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  {
+    rules: {
+      // Standard data-fetching / form-sync effects set loading state; the rule is too strict for this codebase.
+      "react-hooks/set-state-in-effect": "off",
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

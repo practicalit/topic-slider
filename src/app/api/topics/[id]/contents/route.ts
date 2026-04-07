@@ -1,12 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
+import { auditForSessionFireAndForget } from "@/lib/audit-log";
+import { touchTopicUpdatedBy } from "@/lib/topic-touch";
+import {
+  forbidSuperAdminSchoolWrite,
+  requireAdmin,
+  requireAuth,
+  requireAuthForSchool,
+  getTopicForSchoolRead,
+  getTopicInTenant,
+  type ScopedSession,
+} from "@/lib/scope";
+import { parseContentKind, validateContentPayload } from "@/lib/content-api";
+import { parseSlideThemeFromDb, slideThemeToPrismaJson } from "@/lib/slide-theme";
 
 type Params = { params: Promise<{ id: string }> };
 
-// GET /api/topics/:id/contents
 export async function GET(_req: NextRequest, { params }: Params) {
+  const authz = await requireAuthForSchool();
+  if (!authz.ok) return authz.res;
+
   const { id } = await params;
+  const topic = await getTopicForSchoolRead(authz.session, id);
+  if (!topic) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const contents = await prisma.content.findMany({
     where: { topicId: id },
     orderBy: { sortOrder: "asc" },
@@ -14,22 +34,29 @@ export async function GET(_req: NextRequest, { params }: Params) {
   return NextResponse.json(contents);
 }
 
-// POST /api/topics/:id/contents (admin only)
 export async function POST(req: NextRequest, { params }: Params) {
-  const session = await auth();
-  if (!session || session.user.role !== "ADMIN") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  }
+  const authz = await requireAuth();
+  if (!authz.ok) return authz.res;
+  const readOnly = forbidSuperAdminSchoolWrite(authz.session);
+  if (readOnly) return readOnly;
+  const forbidden = requireAdmin(authz.session);
+  if (forbidden) return forbidden;
 
   const { id } = await params;
+  const topic = await getTopicInTenant(authz.session.user.tenantId, id);
+  if (!topic) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const body = await req.json();
   const { title, body: contentBody } = body;
+  const kind = parseContentKind(body.kind);
 
-  if (!title || !contentBody) {
-    return NextResponse.json(
-      { error: "Title and body are required" },
-      { status: 400 }
-    );
+  const titleTrim = typeof title === "string" ? title.trim() : "";
+  const bodyTrim = typeof contentBody === "string" ? contentBody.trim() : "";
+  const err = validateContentPayload(kind, titleTrim, bodyTrim);
+  if (err) {
+    return NextResponse.json({ error: err }, { status: 400 });
   }
 
   const maxOrder = await prisma.content.aggregate({
@@ -37,13 +64,31 @@ export async function POST(req: NextRequest, { params }: Params) {
     _max: { sortOrder: true },
   });
 
+  const slideThemeDb: Prisma.InputJsonValue | typeof Prisma.DbNull =
+    kind === "SLIDE" && body.slideTheme != null
+      ? slideThemeToPrismaJson(parseSlideThemeFromDb(body.slideTheme)!)
+      : Prisma.DbNull;
+
   const content = await prisma.content.create({
     data: {
       topicId: id,
-      title: title.trim(),
-      body: contentBody.trim(),
+      kind,
+      title: titleTrim,
+      body: bodyTrim,
       sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
+      slideTheme: slideThemeDb,
     },
   });
+
+  const uid = authz.session.user.id;
+  await touchTopicUpdatedBy(id, uid);
+  auditForSessionFireAndForget(authz.session as ScopedSession, {
+    action: "CONTENT_CREATE",
+    entityType: "Content",
+    entityId: content.id,
+    summary: `Added content block “${titleTrim}” to topic`,
+    metadata: { topicId: id, kind, title: titleTrim },
+  });
+
   return NextResponse.json(content, { status: 201 });
 }

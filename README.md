@@ -21,6 +21,53 @@ A classroom presentation and quiz tool for substitute teachers and volunteers. W
 - **Student Management**: Add/remove students (first name + last name)
 - **Role-Based Access**: Admin and Volunteer roles with different permissions
 
+### Multi-tenant & teaching context
+
+- **School sites (tenants)**: Data partitioned per site (slug/name); soft-delete support for sites
+- **Class & subject**: Topics, students, and quotes scoped to a class and subject; dedicated **Class & subject** flow
+- **Platform / super-admin**: `SUPER_ADMIN` role, platform area to manage tenants, optional read-only browsing of a chosen school
+- **Per-site quotes**: Inspirational quotes tied to each tenant
+
+### Authentication & access
+
+- **Cross-site username login**: Finds the correct school from username (multi-site picker, optional “remember my site”)
+- **Volunteer invite sign-in**: `/join` — one-time link + passcode for volunteers without a password
+- **System portal**: Entry point for platform operators (separate from school login)
+- **Display names**: Session labels such as `volunteer+name` via display name / invite label
+
+### Admin & operations
+
+- **Volunteer access**: Admins generate time-limited invites (TTL), copy link + passcode
+- **Activity / audit log**: Admin-visible activity log for important changes (topics, content, invites, etc.)
+- **Archive & restore**: Soft-delete and restore flows for tenants and related admin data
+- **Subjects & classes**: Manage subjects and classes under a tenant
+- **Student bulk import**: Bulk import students (spreadsheet-oriented)
+
+### Content & presentation
+
+- **Richer content blocks**: TEXT, SLIDE, IMAGE, and VIDEO; optional slide theme (JSON); video/embed handling
+- **Media uploads**: API for uploading media used in content
+- **Jeopardy**: Per-topic Jeopardy board (categories/cells), editor and play mode, optional AI-assisted generation; configurable grid and team count
+- **Topic attribution**: Created/updated-by metadata on topics
+
+### Quiz, stars & leaderboard
+
+- **Stars & topics**: Star records associated with topics for clearer per-topic performance
+- **Play-mode polish**: Winner splash and related presentation UX around quizzes/Jeopardy
+
+### Students
+
+- **Soft-delete**: Students can be archived/restored (`deletedAt`) instead of only hard-deleted
+- **Class-scoped**: Students belong to tenant + class
+
+### Product / UX
+
+- **Dashboard & help**: Dashboard hub and expanded help / user guide
+- **Header & context**: Active site and class/subject context in the nav; responsive layout
+- **PWA-oriented**: Web app manifest and offline/service-worker shell where enabled
+- **Toasts & clipboard**: Toast feedback and copy-to-clipboard for invites and links
+- **Access messaging**: Clear screens when a role cannot use a page (e.g. super-admin write limits, volunteer restrictions)
+
 ## Prerequisites
 
 - Node.js 20+

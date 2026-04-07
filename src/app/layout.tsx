@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Abyssinica_SIL, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { SessionProvider } from "next-auth/react";
-import { NavBar } from "@/components/nav-bar";
+import { AppProviders } from "@/app/providers";
+import { Header } from "@/components/header";
+import { PwaRegister } from "@/components/pwa-register";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -12,6 +13,13 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+const abyssinica = Abyssinica_SIL({
+  weight: "400",
+  subsets: ["latin", "ethiopic"],
+  variable: "--font-abyssinica",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -27,13 +35,14 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${abyssinica.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-gray-50">
-        <SessionProvider>
-          <NavBar />
+        <AppProviders>
+          <PwaRegister />
+          <Header />
           <main className="flex-1">{children}</main>
-        </SessionProvider>
+        </AppProviders>
       </body>
     </html>
   );

@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
+import { forbidSuperAdminSchoolWrite, requireAuthForSchool, requireTeachingContext } from "@/lib/scope";
 
-// POST /api/stars - award stars to students
 export async function POST(req: NextRequest) {
-  const session = await auth();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  }
+  const authz = await requireAuthForSchool();
+  if (!authz.ok) return authz.res;
+  const readOnly = forbidSuperAdminSchoolWrite(authz.session);
+  if (readOnly) return readOnly;
+  const ctx = requireTeachingContext(authz.session);
+  if (!ctx.ok) return ctx.res;
 
   const body = await req.json();
   const { studentId, topicId, points } = body;
@@ -15,6 +16,34 @@ export async function POST(req: NextRequest) {
   if (!studentId || !topicId || typeof points !== "number") {
     return NextResponse.json(
       { error: "studentId, topicId, and points are required" },
+      { status: 400 }
+    );
+  }
+
+  const [student, topic] = await Promise.all([
+    prisma.student.findFirst({
+      where: {
+        id: studentId,
+        tenantId: ctx.tenantId,
+        classId: ctx.classId,
+        deletedAt: null,
+      },
+    }),
+    prisma.topic.findFirst({
+      where: {
+        id: topicId,
+        tenantId: ctx.tenantId,
+        classId: ctx.classId,
+        subjectId: ctx.subjectId,
+        schoolClass: { deletedAt: null },
+        subject: { deletedAt: null },
+      },
+    }),
+  ]);
+
+  if (!student || !topic) {
+    return NextResponse.json(
+      { error: "Student and topic must belong to your current class and subject" },
       { status: 400 }
     );
   }
@@ -35,25 +64,33 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(star);
 }
 
-// GET /api/stars - leaderboard
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const authz = await requireAuthForSchool();
+  if (!authz.ok) return authz.res;
+  const ctx = requireTeachingContext(authz.session);
+  if (!ctx.ok) return ctx.res;
+
+  const scope = req.nextUrl.searchParams.get("scope");
+  const subjectSession = scope === "subject";
+
   const leaderboard = await prisma.student.findMany({
+    where: { tenantId: ctx.tenantId, classId: ctx.classId, deletedAt: null },
     include: {
-      stars: true,
+      stars: subjectSession
+        ? { where: { topic: { subjectId: ctx.subjectId } } }
+        : true,
     },
-    orderBy: {
-      firstName: "asc",
-    },
+    orderBy: { firstName: "asc" },
   });
 
   const result = leaderboard
-    .map((student: typeof leaderboard[number]) => ({
+    .map((student) => ({
       id: student.id,
       firstName: student.firstName,
       lastName: student.lastName,
-      totalStars: student.stars.reduce((sum: number, s: { points: number }) => sum + s.points, 0),
+      totalStars: student.stars.reduce((sum, s) => sum + s.points, 0),
     }))
-    .sort((a: { totalStars: number }, b: { totalStars: number }) => b.totalStars - a.totalStars);
+    .sort((a, b) => b.totalStars - a.totalStars);
 
   return NextResponse.json(result);
 }
