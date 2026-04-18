@@ -8,60 +8,230 @@ datasource db {
 }
 
 enum Role {
+  SUPER_ADMIN
   ADMIN
   VOLUNTEER
 }
 
+/// Block type inside a topic (presentation + admin)
+enum ContentKind {
+  TEXT // Markdown body
+  SLIDE // Title + markdown, slide-style layout
+  IMAGE // body = image URL (https)
+  VIDEO // body = YouTube / Vimeo / direct video URL, or other link
+}
+
+/// Site / region (DC1, DC2, VA1, …) — all data is partitioned by tenant.
+/// Exactly one row may have isPlatform=true (internal home for SUPER_ADMIN users only).
+model Tenant {
+  id         String        @id @default(cuid())
+  slug       String
+  name       String
+  isPlatform Boolean       @default(false)
+  deletedAt  DateTime?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  users      User[]
+  classes    SchoolClass[]
+  subjects   Subject[]
+  topics     Topic[]
+  students   Student[]
+  quotes     Quote[]
+
+  @@index([slug])
+  @@index([deletedAt])
+}
+
+/// Class section within a tenant (111, 113, …)
+model SchoolClass {
+  id        String    @id @default(cuid())
+  tenantId  String
+  code      String
+  name      String?
+  deletedAt DateTime?
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  students  Student[]
+  topics    Topic[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([tenantId, code])
+  @@index([deletedAt])
+}
+
+/// Subject track within a tenant (Bible Study, Mezmur, …)
+model Subject {
+  id        String    @id @default(cuid())
+  tenantId  String
+  name      String
+  deletedAt DateTime?
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  topics    Topic[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([tenantId, name])
+  @@index([deletedAt])
+}
+
 model User {
-  id        String   @id @default(cuid())
-  username  String   @unique
-  password  String
-  role      Role     @default(VOLUNTEER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String            @id @default(cuid())
+  tenantId         String
+  username         String
+  password         String
+  role             Role              @default(VOLUNTEER)
+  /// Shown after one-time invite as volunteer+{displayName}; optional for password login volunteers.
+  displayName      String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  volunteerInvites VolunteerInvite[]
+  topicsCreated    Topic[]           @relation("TopicCreatedBy")
+  topicsUpdated    Topic[]           @relation("TopicUpdatedBy")
+
+  @@unique([tenantId, username])
+  @@index([tenantId])
+}
+
+model VolunteerInvite {
+  id             String    @id @default(cuid())
+  token          String    @unique
+  passcodeHash   String
+  /// Set only for legacy rows; new invites are link + passcode only.
+  telegramChatId String?
+  /// Volunteer’s name for session label volunteer+{volunteerLabel} after sign-in.
+  volunteerLabel String?
+  userId         String
+  expiresAt      DateTime
+  usedAt         DateTime?
+  createdById    String?
+  createdAt      DateTime  @default(now())
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
 }
 
 model Topic {
-  id          String    @id @default(cuid())
-  title       String
-  description String?
-  sortOrder   Int       @default(0)
-  taught      Boolean   @default(false)
-  taughtAt    DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  contents    Content[]
-  quizzes     Quiz[]
+  id                 String             @id @default(cuid())
+  tenantId           String
+  classId            String
+  subjectId          String
+  title              String
+  description        String?
+  sortOrder          Int                @default(0)
+  taught             Boolean            @default(false)
+  taughtAt           DateTime?
+  /// Jeopardy board width (max categories); 2–10
+  jeopardyColumns    Int                @default(5)
+  /// Jeopardy board depth (cells per category); 2–10
+  jeopardyRows       Int                @default(5)
+  /// Default number of teams/groups in team play mode; 2–8
+  jeopardyTeamCount  Int                @default(2)
+  createdById        String?
+  updatedById        String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  tenant             Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  schoolClass        SchoolClass        @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject            Subject            @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  createdBy          User?              @relation("TopicCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy          User?              @relation("TopicUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  contents           Content[]
+  quizzes            Quiz[]
+  jeopardyCategories JeopardyCategory[]
+  stars              Star[]
+
+  @@index([tenantId])
+  @@index([tenantId, classId, subjectId])
+}
+
+/// Append-only activity trail for admins (topics, content, invites, etc.).
+model AuditLog {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  actorUserId String?
+  actorLabel  String?
+  action      String
+  entityType  String
+  entityId    String?
+  summary     String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@index([entityType, entityId])
 }
 
 model Content {
-  id        String   @id @default(cuid())
-  topicId   String
-  title     String
-  body      String   @db.Text
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  id            String         @id @default(cuid())
+  topicId       String
+  kind          ContentKind    @default(TEXT)
+  title         String
+  body          String         @db.Text
+  /// Optional SLIDE-only: fonts, colors, backgrounds (JSON). Null = site default layout.
+  slideTheme    Json?
+  sortOrder     Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  topic         Topic          @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  jeopardyCells JeopardyCell[]
 
   @@index([topicId])
 }
 
+/// Jeopardy-style column for a topic (built from slides / quizzes or edited manually)
+model JeopardyCategory {
+  id        String         @id @default(cuid())
+  topicId   String
+  title     String
+  sortOrder Int            @default(0)
+  topic     Topic          @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  cells     JeopardyCell[]
+
+  @@index([topicId])
+}
+
+model JeopardyCell {
+  id         String           @id @default(cuid())
+  categoryId String
+  points     Int
+  clue       String           @db.Text
+  answer     String           @db.Text
+  sortOrder  Int              @default(0)
+  contentId  String?
+  category   JeopardyCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  content    Content?         @relation(fields: [contentId], references: [id], onDelete: SetNull)
+
+  @@index([categoryId])
+}
+
 model Student {
-  id        String   @id @default(cuid())
-  firstName String
-  lastName  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  stars     Star[]
+  id          String      @id @default(cuid())
+  tenantId    String
+  classId     String
+  firstName   String
+  lastName    String
+  deletedAt   DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  schoolClass SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  stars       Star[]
+
+  @@index([tenantId])
+  @@index([tenantId, classId])
+  @@index([deletedAt])
 }
 
 model Quiz {
   id        String   @id @default(cuid())
   topicId   String
   question  String
-  options   String[] // array of options
-  answer    Int      // index of correct option
+  options   String[]
+  answer    Int
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
@@ -76,15 +246,21 @@ model Star {
   points    Int      @default(0)
   createdAt DateTime @default(now())
   student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, topicId])
   @@index([studentId])
+  @@index([topicId])
 }
 
 model Quote {
-  id          String @id @default(cuid())
-  quote       String // the quote text (Amharic or English)
-  reference   String // e.g. "ዮሐንስ 3:16"
-  category    String // e.g. "hope", "happiness", "resilience"
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  tenantId  String
+  quote     String
+  reference String
+  category  String
+  createdAt DateTime @default(now())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
 }

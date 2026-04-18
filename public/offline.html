@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#4f46e5" />
+    <title>Offline — MK Educator</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        font-family: system-ui, sans-serif;
+        background: #f9fafb;
+        color: #111827;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: max(1.5rem, env(safe-area-inset-top)) max(1.5rem, env(safe-area-inset-right))
+          max(1.5rem, env(safe-area-inset-bottom)) max(1.5rem, env(safe-area-inset-left));
+        text-align: center;
+      }
+      h1 {
+        font-size: clamp(1.25rem, 4vw, 1.75rem);
+        margin: 0 0 0.75rem;
+      }
+      p {
+        font-size: clamp(0.95rem, 2.5vw, 1.1rem);
+        opacity: 0.85;
+        max-width: 28rem;
+        line-height: 1.5;
+      }
+      a {
+        display: inline-block;
+        margin-top: 1.5rem;
+        padding: 0.75rem 1.25rem;
+        background: #4f46e5;
+        color: #ffffff;
+        text-decoration: none;
+        font-weight: 600;
+        border-radius: 0.5rem;
+        min-height: 44px;
+        line-height: 1.25;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>You’re offline</h1>
+    <p>Check your Wi‑Fi or mobile connection, then try again. Open lessons need the network unless they were already loaded.</p>
+    <a href="/">Try again</a>
+  </body>
+</html>

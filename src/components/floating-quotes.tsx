@@ -59,18 +59,23 @@ function randomPosition(slot: number) {
   };
 }
 
-export function FloatingQuotes() {
+export function FloatingQuotes({ tenantSlug }: { tenantSlug?: string }) {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [floating, setFloating] = useState<FloatingQuote[]>([]);
 
   useEffect(() => {
-    fetch("/api/quotes")
+    const slug = tenantSlug?.trim().toLowerCase();
+    const url = slug ? `/api/quotes?tenantSlug=${encodeURIComponent(slug)}` : "/api/quotes";
+    fetch(url)
       .then((r) => r.json())
       .then((data: Quote[]) => {
         if (Array.isArray(data) && data.length > 0) setQuotes(data);
+        else setQuotes([]);
       })
-      .catch(() => {});
-  }, []);
+      .catch(() => {
+        setQuotes([]);
+      });
+  }, [tenantSlug]);
 
   const spawnPair = useCallback(() => {
     if (quotes.length < 2) return;
