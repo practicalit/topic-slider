@@ -13,11 +13,18 @@ export async function GET() {
   const ctx = requireTeachingContext(authz.session);
   if (!ctx.ok) return ctx.res;
 
-  const students = await prisma.student.findMany({
-    where: { tenantId: ctx.tenantId, classId: ctx.classId, deletedAt: null },
-    orderBy: { firstName: "asc" },
-    include: { stars: true },
+  // Return students enrolled in the current session class (excluding soft-deleted students)
+  const enrollments = await prisma.studentClassEnrollment.findMany({
+    where: { classId: ctx.classId, tenantId: ctx.tenantId, student: { deletedAt: null } },
+    orderBy: { student: { firstName: "asc" } },
+    include: {
+      student: {
+        include: { stars: true },
+      },
+    },
   });
+
+  const students = enrollments.map((e) => e.student);
   return NextResponse.json(students);
 }
 
@@ -47,12 +54,18 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Create student (tenant-level) and immediately enroll in current class
   const student = await prisma.student.create({
     data: {
       tenantId: ctx.tenantId,
-      classId: ctx.classId,
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
+      firstName: (firstName as string).trim(),
+      lastName: (lastName as string).trim(),
+      enrollments: {
+        create: {
+          tenantId: ctx.tenantId,
+          classId: ctx.classId,
+        },
+      },
     },
   });
   return NextResponse.json(student, { status: 201 });

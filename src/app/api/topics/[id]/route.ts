@@ -22,13 +22,11 @@ export async function GET(_req: NextRequest, { params }: Params) {
       ? {
           id,
           tenant: { isPlatform: false, deletedAt: null },
-          schoolClass: { deletedAt: null },
           subject: { deletedAt: null },
         }
       : {
           id,
           tenantId: authz.session.user.tenantId,
-          schoolClass: { deletedAt: null },
           subject: { deletedAt: null },
         };
 
@@ -49,7 +47,19 @@ export async function GET(_req: NextRequest, { params }: Params) {
       { status: 404 }
     );
   }
-  return NextResponse.json(topic);
+
+  // Attach per-class taught status if the session has a classId
+  const classId = authz.session.user.classId;
+  let taught = false;
+  if (classId) {
+    const progress = await prisma.classTopicProgress.findUnique({
+      where: { classId_topicId: { classId, topicId: id } },
+      select: { taught: true },
+    });
+    taught = progress?.taught ?? false;
+  }
+
+  return NextResponse.json({ ...topic, taught });
 }
 
 // PUT /api/topics/:id — admin, same site
@@ -73,7 +83,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   }
 
   const body = await req.json();
-  const { title, description, taught } = body;
+  const { title, description } = body;
 
   const uid = authz.session.user.id;
   const topic = await prisma.topic.update({
@@ -81,10 +91,6 @@ export async function PUT(req: NextRequest, { params }: Params) {
     data: {
       ...(title !== undefined && { title: title.trim() }),
       ...(description !== undefined && { description: description?.trim() || null }),
-      ...(taught !== undefined && {
-        taught,
-        taughtAt: taught ? new Date() : null,
-      }),
       updatedById: uid,
     },
   });
@@ -96,7 +102,6 @@ export async function PUT(req: NextRequest, { params }: Params) {
     summary: `Updated topic “${topic.title}”`,
     metadata: {
       title: topic.title,
-      taught: topic.taught,
     },
   });
 

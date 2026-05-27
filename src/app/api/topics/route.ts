@@ -7,23 +7,35 @@ import {
   requireAuthForSchool,
   requireTeachingContext,
   type ScopedSession,
-  verifyClassInTenant,
   verifySubjectInTenant,
 } from "@/lib/scope";
 
-// GET /api/topics — current site + class + subject from session
-export async function GET() {
+// GET /api/topics — topics for a subject; subjectId from session context or ?subjectId= query param
+export async function GET(req: NextRequest) {
   const authz = await requireAuthForSchool();
   if (!authz.ok) return authz.res;
-  const ctx = requireTeachingContext(authz.session);
-  if (!ctx.ok) return ctx.res;
+
+  const { searchParams } = new URL(req.url);
+  const qSubjectId = searchParams.get("subjectId");
+
+  let tenantId: string, subjectId: string;
+
+  if (qSubjectId) {
+    // Admin explicitly specifying subject (no session context required)
+    const forbidden = requireAdmin(authz.session);
+    if (forbidden) return forbidden;
+    tenantId = authz.session.user.tenantId;
+    subjectId = qSubjectId;
+  } else {
+    const ctx = requireTeachingContext(authz.session);
+    if (!ctx.ok) return ctx.res;
+    ({ tenantId, subjectId } = ctx);
+  }
 
   const topics = await prisma.topic.findMany({
     where: {
-      tenantId: ctx.tenantId,
-      classId: ctx.classId,
-      subjectId: ctx.subjectId,
-      schoolClass: { deletedAt: null },
+      tenantId,
+      subjectId,
       subject: { deletedAt: null },
     },
     orderBy: { sortOrder: "asc" },
@@ -36,7 +48,7 @@ export async function GET() {
   return NextResponse.json(topics);
 }
 
-// POST /api/topics — admin; class + subject must belong to your site
+// POST /api/topics — admin; subject must belong to your site
 export async function POST(req: NextRequest) {
   const authz = await requireAuth();
   if (!authz.ok) return authz.res;
@@ -44,38 +56,32 @@ export async function POST(req: NextRequest) {
   if (forbidden) return forbidden;
 
   const body = await req.json();
-  const { title, description, classId, subjectId } = body as {
+  const { title, description, subjectId } = body as {
     title?: string;
     description?: string;
-    classId?: string;
     subjectId?: string;
   };
 
   if (!title || typeof title !== "string") {
     return NextResponse.json({ error: "Title is required" }, { status: 400 });
   }
-  if (!classId || typeof classId !== "string" || !subjectId || typeof subjectId !== "string") {
+  if (!subjectId || typeof subjectId !== "string") {
     return NextResponse.json(
-      { error: "classId and subjectId are required" },
+      { error: "subjectId is required" },
       { status: 400 }
     );
   }
 
   const tenantId = authz.session.user.tenantId;
-  const [cls, sub] = await Promise.all([
-    verifyClassInTenant(tenantId, classId),
-    verifySubjectInTenant(tenantId, subjectId),
-  ]);
-  if (!cls || !sub) {
-    return NextResponse.json({ error: "Invalid class or subject for this site" }, { status: 400 });
+  const sub = await verifySubjectInTenant(tenantId, subjectId);
+  if (!sub) {
+    return NextResponse.json({ error: "Invalid subject for this site" }, { status: 400 });
   }
 
   const maxOrder = await prisma.topic.aggregate({
     where: {
       tenantId,
-      classId,
       subjectId,
-      schoolClass: { deletedAt: null },
       subject: { deletedAt: null },
     },
     _max: { sortOrder: true },
@@ -85,7 +91,6 @@ export async function POST(req: NextRequest) {
   const topic = await prisma.topic.create({
     data: {
       tenantId,
-      classId,
       subjectId,
       title: title.trim(),
       description: description?.trim() || null,
@@ -104,9 +109,10 @@ export async function POST(req: NextRequest) {
     action: "TOPIC_CREATE",
     entityType: "Topic",
     entityId: topic.id,
-    summary: `Created topic “${topic.title}”`,
-    metadata: { title: topic.title, classId, subjectId },
+    summary: `Created topic "${topic.title}"`,
+    metadata: { title: topic.title, subjectId },
   });
 
   return NextResponse.json(topic, { status: 201 });
 }
+

@@ -173,7 +173,6 @@ async function seedRichSampleContent(tenantId: string) {
     let row = await prisma.student.findFirst({
       where: {
         tenantId,
-        classId: class111.id,
         firstName: s.firstName,
         lastName: s.lastName,
         deletedAt: null,
@@ -183,9 +182,9 @@ async function seedRichSampleContent(tenantId: string) {
       row = await prisma.student.create({
         data: {
           tenantId,
-          classId: class111.id,
           firstName: s.firstName,
           lastName: s.lastName,
+          enrollments: { create: { tenantId, classId: class111.id } },
         },
       });
     }
@@ -195,13 +194,11 @@ async function seedRichSampleContent(tenantId: string) {
   const topicMain = await prisma.topic.create({
     data: {
       tenantId,
-      classId: class111.id,
       subjectId: bible.id,
       title: RICH_SAMPLE_TOPIC_TITLE,
       description:
         "Demonstrates TEXT, SLIDE, IMAGE (https), VIDEO (YouTube), and quizzes — safe to delete in production.",
       sortOrder: 0,
-      taught: false,
     },
   });
 
@@ -322,14 +319,17 @@ God invites us into **peace** and **trust**.
   const topicTaught = await prisma.topic.create({
     data: {
       tenantId,
-      classId: class113.id,
       subjectId: mezmur.id,
       title: "Sample: Taught topic (seed)",
-      description: "Marked taught with a past date — appears as completed in filters.",
+      description: "A sample taught topic — appears as completed in per-class filters.",
       sortOrder: 0,
-      taught: true,
-      taughtAt,
     },
+  });
+  // Mark as taught for class113
+  await prisma.classTopicProgress.upsert({
+    where: { classId_topicId: { classId: class113.id, topicId: topicTaught.id } },
+    create: { tenantId, classId: class113.id, topicId: topicTaught.id, taught: true, taughtAt },
+    update: {},
   });
 
   await prisma.content.create({

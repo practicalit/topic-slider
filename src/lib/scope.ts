@@ -167,7 +167,6 @@ export async function getTopicInTenant(tenantId: string, topicId: string) {
     where: {
       id: topicId,
       tenantId,
-      schoolClass: { deletedAt: null },
       subject: { deletedAt: null },
     },
   });
@@ -180,7 +179,6 @@ export async function getTopicForSchoolRead(session: ScopedSession, topicId: str
       where: {
         id: topicId,
         tenant: { isPlatform: false, deletedAt: null },
-        schoolClass: { deletedAt: null },
         subject: { deletedAt: null },
       },
     });

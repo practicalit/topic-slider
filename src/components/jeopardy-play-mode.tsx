@@ -258,7 +258,7 @@ export function JeopardyPlayMode({
                       const v = e.target.value;
                       setTeamNames((prev) => prev.map((p, j) => (j === i ? v : p)));
                     }}
-                    className="min-w-[5.5rem] max-w-[8rem] flex-1 rounded-md border border-amber-400/35 bg-slate-900 px-2 py-1 text-xs text-white"
+                    className="min-w-22 max-w-32 flex-1 rounded-md border border-amber-400/35 bg-slate-900 px-2 py-1 text-xs text-white"
                     aria-label={`Team ${i + 1} name`}
                   />
                 ))}
@@ -315,14 +315,14 @@ export function JeopardyPlayMode({
       <div className="flex-1 overflow-auto p-4">
         <div className="max-w-6xl mx-auto overflow-x-auto">
           <div
-            className="grid gap-2 min-w-[640px]"
+            className="grid gap-2 min-w-160"
             style={{
               gridTemplateColumns: `repeat(${categories.length}, minmax(0, 1fr))`,
             }}
           >
             {categories.map((cat) => (
               <div key={cat.id} className="flex flex-col gap-2">
-                <div className="min-h-[3.5rem] flex items-center justify-center rounded-lg bg-amber-400 px-2 py-2 text-center text-sm font-bold uppercase tracking-wide text-gray-900 leading-tight">
+                <div className="min-h-14 flex items-center justify-center rounded-lg bg-amber-400 px-2 py-2 text-center text-sm font-bold uppercase tracking-wide text-gray-900 leading-tight">
                   {cat.title}
                 </div>
                 {cat.cells.map((cell) => {
@@ -333,7 +333,7 @@ export function JeopardyPlayMode({
                       type="button"
                       disabled={done}
                       onClick={() => openCell(cell)}
-                      className={`min-h-[4rem] rounded-lg border-2 text-lg font-bold tabular-nums transition-all ${
+                      className={`min-h-16 rounded-lg border-2 text-lg font-bold tabular-nums transition-all ${
                         done
                           ? "border-slate-700 bg-slate-900/50 text-white/35 cursor-default line-through"
                           : "border-amber-400/50 bg-indigo-600 text-white shadow-md hover:border-amber-400 hover:scale-[1.02] active:scale-[0.98]"

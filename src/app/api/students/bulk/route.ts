@@ -68,14 +68,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No valid name rows" }, { status: 400 });
   }
 
-  const { count } = await prisma.student.createMany({
-    data: rows.map((r) => ({
-      tenantId: ctx.tenantId,
-      classId: ctx.classId,
-      firstName: r.firstName,
-      lastName: r.lastName,
-    })),
+  // Create all students (tenant-level, no classId), then bulk-enroll in current class
+  const created = await prisma.$transaction(async (tx) => {
+    const students = await Promise.all(
+      rows.map((r) =>
+        tx.student.create({
+          data: {
+            tenantId: ctx.tenantId,
+            firstName: r.firstName,
+            lastName: r.lastName,
+          },
+        })
+      )
+    );
+    await tx.studentClassEnrollment.createMany({
+      data: students.map((s) => ({
+        tenantId: ctx.tenantId,
+        classId: ctx.classId,
+        studentId: s.id,
+      })),
+      skipDuplicates: true,
+    });
+    return students.length;
   });
 
-  return NextResponse.json({ created: count, requested: rows.length }, { status: 201 });
+  return NextResponse.json({ created, requested: rows.length }, { status: 201 });
 }

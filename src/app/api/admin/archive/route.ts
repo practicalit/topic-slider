@@ -46,8 +46,9 @@ export async function GET() {
         firstName: true,
         lastName: true,
         deletedAt: true,
-        classId: true,
-        schoolClass: { select: { code: true, deletedAt: true } },
+        enrollments: {
+          select: { class: { select: { code: true, deletedAt: true } } },
+        },
       },
     }),
   ]);

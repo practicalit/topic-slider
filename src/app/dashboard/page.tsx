@@ -52,11 +52,11 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Link href="/present" className={cardClass}>
+        <Link href="/context" className={cardClass}>
           <div className="text-3xl mb-3">📖</div>
           <h2 className="text-xl font-semibold text-gray-900 group-hover:text-indigo-600">Present a Topic</h2>
           <p className="text-gray-500 mt-2">
-            Choose an untaught topic and walk through the content slides with students
+            Pick your class and topic — slides open right away
           </p>
         </Link>
 

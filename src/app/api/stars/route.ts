@@ -25,17 +25,15 @@ export async function POST(req: NextRequest) {
       where: {
         id: studentId,
         tenantId: ctx.tenantId,
-        classId: ctx.classId,
         deletedAt: null,
+        enrollments: { some: { classId: ctx.classId } },
       },
     }),
     prisma.topic.findFirst({
       where: {
         id: topicId,
         tenantId: ctx.tenantId,
-        classId: ctx.classId,
         subjectId: ctx.subjectId,
-        schoolClass: { deletedAt: null },
         subject: { deletedAt: null },
       },
     }),
@@ -72,16 +70,25 @@ export async function GET(req: NextRequest) {
 
   const scope = req.nextUrl.searchParams.get("scope");
   const subjectSession = scope === "subject";
+  const baseWhere = {
+    tenantId: ctx.tenantId,
+    deletedAt: null as null,
+    enrollments: { some: { classId: ctx.classId } },
+  };
 
-  const leaderboard = await prisma.student.findMany({
-    where: { tenantId: ctx.tenantId, classId: ctx.classId, deletedAt: null },
-    include: {
-      stars: subjectSession
-        ? { where: { topic: { subjectId: ctx.subjectId } } }
-        : true,
-    },
-    orderBy: { firstName: "asc" },
-  });
+  type StudentRow = { id: string; firstName: string; lastName: string; stars: { points: number }[] };
+
+  const leaderboard: StudentRow[] = subjectSession
+    ? await prisma.student.findMany({
+        where: baseWhere,
+        include: { stars: { where: { topic: { subjectId: ctx.subjectId } } } },
+        orderBy: { firstName: "asc" },
+      })
+    : await prisma.student.findMany({
+        where: baseWhere,
+        include: { stars: true },
+        orderBy: { firstName: "asc" },
+      });
 
   const result = leaderboard
     .map((student) => ({
