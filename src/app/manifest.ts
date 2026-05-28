@@ -37,12 +37,6 @@ export default function manifest(): MetadataRoute.Manifest {
     ],
     shortcuts: [
       {
-        name: "Present",
-        short_name: "Present",
-        description: "Open presentation mode",
-        url: "/present",
-      },
-      {
         name: "Sign in",
         short_name: "Login",
         url: "/login",

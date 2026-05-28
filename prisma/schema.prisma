@@ -24,19 +24,21 @@ enum ContentKind {
 /// Site / region (DC1, DC2, VA1, …) — all data is partitioned by tenant.
 /// Exactly one row may have isPlatform=true (internal home for SUPER_ADMIN users only).
 model Tenant {
-  id         String        @id @default(cuid())
-  slug       String
-  name       String
-  isPlatform Boolean       @default(false)
-  deletedAt  DateTime?
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
-  users      User[]
-  classes    SchoolClass[]
-  subjects   Subject[]
-  topics     Topic[]
-  students   Student[]
-  quotes     Quote[]
+  id                  String                   @id @default(cuid())
+  slug                String
+  name                String
+  isPlatform          Boolean                  @default(false)
+  deletedAt           DateTime?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  users               User[]
+  classes             SchoolClass[]
+  subjects            Subject[]
+  topics              Topic[]
+  students            Student[]
+  quotes              Quote[]
+  topicProgress       ClassTopicProgress[]
+  studentEnrollments  StudentClassEnrollment[]
 
   @@index([slug])
   @@index([deletedAt])
@@ -44,16 +46,16 @@ model Tenant {
 
 /// Class section within a tenant (111, 113, …)
 model SchoolClass {
-  id        String    @id @default(cuid())
-  tenantId  String
-  code      String
-  name      String?
-  deletedAt DateTime?
-  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  students  Student[]
-  topics    Topic[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id                 String                   @id @default(cuid())
+  tenantId           String
+  code               String
+  name               String?
+  deletedAt          DateTime?
+  tenant             Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  enrollments        StudentClassEnrollment[]
+  topicProgress      ClassTopicProgress[]
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
 
   @@index([tenantId])
   @@index([tenantId, code])
@@ -115,37 +117,54 @@ model VolunteerInvite {
 }
 
 model Topic {
-  id                 String             @id @default(cuid())
+  id                 String               @id @default(cuid())
   tenantId           String
-  classId            String
   subjectId          String
   title              String
   description        String?
-  sortOrder          Int                @default(0)
-  taught             Boolean            @default(false)
-  taughtAt           DateTime?
+  sortOrder          Int                  @default(0)
   /// Jeopardy board width (max categories); 2–10
-  jeopardyColumns    Int                @default(5)
+  jeopardyColumns    Int                  @default(5)
   /// Jeopardy board depth (cells per category); 2–10
-  jeopardyRows       Int                @default(5)
+  jeopardyRows       Int                  @default(5)
   /// Default number of teams/groups in team play mode; 2–8
-  jeopardyTeamCount  Int                @default(2)
+  jeopardyTeamCount  Int                  @default(2)
   createdById        String?
   updatedById        String?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  tenant             Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  schoolClass        SchoolClass        @relation(fields: [classId], references: [id], onDelete: Cascade)
-  subject            Subject            @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  createdBy          User?              @relation("TopicCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedBy          User?              @relation("TopicUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  tenant             Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subject            Subject              @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  createdBy          User?                @relation("TopicCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy          User?                @relation("TopicUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   contents           Content[]
   quizzes            Quiz[]
   jeopardyCategories JeopardyCategory[]
   stars              Star[]
+  progress           ClassTopicProgress[]
 
   @@index([tenantId])
-  @@index([tenantId, classId, subjectId])
+  @@index([tenantId, subjectId])
+}
+
+/// Tracks which topics have been taught in which class (per-class taught status).
+model ClassTopicProgress {
+  id        String      @id @default(cuid())
+  tenantId  String
+  classId   String
+  topicId   String
+  taught    Boolean     @default(false)
+  taughtAt  DateTime?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  tenant    Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  class     SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  topic     Topic       @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([classId, topicId])
+  @@index([tenantId])
+  @@index([classId])
+  @@index([topicId])
 }
 
 /// Append-only activity trail for admins (topics, content, invites, etc.).
@@ -209,21 +228,36 @@ model JeopardyCell {
 }
 
 model Student {
-  id          String      @id @default(cuid())
+  id          String                   @id @default(cuid())
   tenantId    String
-  classId     String
   firstName   String
   lastName    String
   deletedAt   DateTime?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  schoolClass SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+  tenant      Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  enrollments StudentClassEnrollment[]
   stars       Star[]
 
   @@index([tenantId])
-  @@index([tenantId, classId])
   @@index([deletedAt])
+}
+
+/// Tracks which students are enrolled in which class (many-to-many).
+model StudentClassEnrollment {
+  id        String      @id @default(cuid())
+  tenantId  String
+  classId   String
+  studentId String
+  createdAt DateTime    @default(now())
+  tenant    Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  class     SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  student   Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([classId, studentId])
+  @@index([tenantId])
+  @@index([classId])
+  @@index([studentId])
 }
 
 model Quiz {

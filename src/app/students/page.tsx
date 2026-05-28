@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { TeachingContextGuard } from "@/components/teaching-context-guard";
 import { StudentBulkImport } from "@/components/student-bulk-import";
@@ -13,12 +13,26 @@ interface Student {
   stars: { id: string; points: number; topicId: string }[];
 }
 
+interface SearchStudent {
+  id: string;
+  firstName: string;
+  lastName: string;
+}
+
 export default function StudentsPage() {
   const { data: session, status } = useSession();
   const [students, setStudents] = useState<Student[]>([]);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [loading, setLoading] = useState(true);
+
+  // Enroll existing student
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchStudent[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const classId = session?.user?.classId;
 
   const fetchStudents = useCallback(async () => {
     if (status !== "authenticated" || !session?.user || !sessionHasTeachingContext(session.user)) {
@@ -40,6 +54,32 @@ export default function StudentsPage() {
     void fetchStudents();
   }, [fetchStudents]);
 
+  // Debounced search for existing students not yet in this class
+  useEffect(() => {
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    if (!searchQuery.trim() || !classId) {
+      setSearchResults([]);
+      return;
+    }
+    setSearchLoading(true);
+    searchTimeout.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/students/search?q=${encodeURIComponent(searchQuery.trim())}&classId=${encodeURIComponent(classId)}`
+        );
+        const data = (await res.json()) as unknown;
+        setSearchResults(Array.isArray(data) ? (data as SearchStudent[]) : []);
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 300);
+    return () => {
+      if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    };
+  }, [searchQuery, classId]);
+
   async function handleAddStudent(e: React.FormEvent) {
     e.preventDefault();
     if (!firstName.trim() || !lastName.trim()) return;
@@ -52,18 +92,25 @@ export default function StudentsPage() {
 
     setFirstName("");
     setLastName("");
-    fetchStudents();
+    void fetchStudents();
   }
 
-  async function handleDeleteStudent(id: string) {
+  async function handleEnrollExisting(studentId: string) {
+    await fetch(`/api/students/${studentId}/enroll`, { method: "POST" });
+    setSearchQuery("");
+    setSearchResults([]);
+    void fetchStudents();
+  }
+
+  async function handleUnenrollStudent(id: string) {
     if (
       !confirm(
-        "Archive this student? They will be hidden from lists; an admin can restore from Admin → Archive & restore."
+        "Remove this student from the class? They will still exist in other classes they are enrolled in."
       )
     )
       return;
     await fetch(`/api/students/${id}`, { method: "DELETE" });
-    fetchStudents();
+    void fetchStudents();
   }
 
   return (
@@ -74,8 +121,9 @@ export default function StudentsPage() {
         <div className="max-w-3xl mx-auto px-4 py-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-8">Students</h1>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Add Student</h2>
+          {/* Add new student */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-4">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Add New Student</h2>
             <form onSubmit={handleAddStudent} className="flex flex-col sm:flex-row gap-3">
               <input
                 type="text"
@@ -102,11 +150,54 @@ export default function StudentsPage() {
             </form>
           </div>
 
+          {/* Enroll existing student */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-4">
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">Enroll Existing Student</h2>
+            <p className="text-sm text-gray-500 mb-3">
+              Search students from other classes and add them to this class.
+            </p>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by name…"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-gray-900"
+            />
+            {searchLoading && (
+              <p className="text-sm text-gray-400 mt-2">Searching…</p>
+            )}
+            {!searchLoading && searchResults.length > 0 && (
+              <ul className="mt-2 border border-gray-200 rounded-lg overflow-hidden divide-y divide-gray-100">
+                {searchResults.map((s) => (
+                  <li
+                    key={s.id}
+                    className="flex items-center justify-between px-4 py-2 hover:bg-gray-50"
+                  >
+                    <span className="text-gray-900">
+                      {s.firstName} {s.lastName}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void handleEnrollExisting(s.id)}
+                      className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+                    >
+                      Enroll
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {!searchLoading && searchQuery.trim() && searchResults.length === 0 && (
+              <p className="text-sm text-gray-400 mt-2">No matching students found outside this class.</p>
+            )}
+          </div>
+
           <StudentBulkImport onImported={fetchStudents} />
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          {/* Enrolled students list */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mt-4">
             {students.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No students yet. Add one above.</p>
+              <p className="text-gray-500 text-center py-8">No students enrolled. Add one above.</p>
             ) : (
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
@@ -142,7 +233,7 @@ export default function StudentsPage() {
                       <td className="px-6 py-4 text-right">
                         <button
                           type="button"
-                          onClick={() => handleDeleteStudent(student.id)}
+                          onClick={() => void handleUnenrollStudent(student.id)}
                           className="text-red-600 hover:text-red-800 text-sm font-medium"
                         >
                           Remove

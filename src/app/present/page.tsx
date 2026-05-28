@@ -4,15 +4,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { TeachingContextGuard } from "@/components/teaching-context-guard";
-import { sessionHasTeachingContext } from "@/lib/teaching-context-client";
 
 interface Topic {
   id: string;
   title: string;
   description: string | null;
   taught: boolean;
-  taughtAt: string | null;
-  _count: { contents: number; quizzes: number };
+  _count: { contents: number };
+  subject: { name: string };
 }
 
 export default function PresentPage() {
@@ -23,11 +22,12 @@ export default function PresentPage() {
 
   useEffect(() => {
     if (status !== "authenticated" || !session?.user) return;
-    if (!sessionHasTeachingContext(session.user)) return;
+    const classId = session.user.classId;
+    if (!classId) return;
 
     let cancelled = false;
     setLoading(true);
-    fetch("/api/topics")
+    fetch(`/api/me/topics?classId=${encodeURIComponent(classId)}`)
       .then(async (r) => {
         const data = (await r.json()) as unknown;
         if (cancelled) return;
@@ -109,7 +109,7 @@ export default function PresentPage() {
             )}
             <div className="flex gap-3 mt-3 text-xs text-gray-500">
               <span>{topic._count.contents} slides</span>
-              <span>{topic._count.quizzes} quiz questions</span>
+              <span className="text-gray-400">{topic.subject.name}</span>
             </div>
             {topic._count.contents === 0 && (
               <p className="text-amber-700 text-xs mt-2">No content yet — add slides in admin</p>

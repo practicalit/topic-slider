@@ -48,6 +48,13 @@ interface Topic {
   quizzes: Quiz[];
 }
 
+interface RosterStudent {
+  id: string;
+  firstName: string;
+  lastName: string;
+  stars: { id: string; points: number; topicId: string }[];
+}
+
 type Mode = "slides" | "quiz" | "jeopardy";
 
 function hasJeopardyCells(categories: JeopardyCategoryDTO[]) {
@@ -70,14 +77,20 @@ export default function PresentTopicPage() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [mode, setMode] = useState<Mode>("slides");
   const [loading, setLoading] = useState(true);
+  const [roster, setRoster] = useState<RosterStudent[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    Promise.all([fetch(`/api/topics/${id}`), fetch(`/api/topics/${id}/jeopardy`)])
-      .then(async ([topicRes, jeopardyRes]) => {
+    Promise.all([
+      fetch(`/api/topics/${id}`),
+      fetch(`/api/topics/${id}/jeopardy`),
+      fetch("/api/students"),
+    ])
+      .then(async ([topicRes, jeopardyRes, studentsRes]) => {
         const topicData = topicRes.ok ? await topicRes.json() : null;
         const jeopardyData = jeopardyRes.ok ? await jeopardyRes.json() : { categories: [] };
+        const studentsData = studentsRes.ok ? await studentsRes.json() : [];
         if (cancelled) return;
         if (topicData) {
           setTopic(topicData);
@@ -85,6 +98,7 @@ export default function PresentTopicPage() {
         } else {
           setTopic(null);
         }
+        setRoster(Array.isArray(studentsData) ? (studentsData as RosterStudent[]) : []);
         setJeopardyCategories(
           Array.isArray(jeopardyData.categories) ? jeopardyData.categories : []
         );
@@ -227,6 +241,7 @@ export default function PresentTopicPage() {
           markAsTaught();
           router.push("/present");
         }}
+        roster={roster}
       />
     );
   }
@@ -245,6 +260,7 @@ type PresentSlidesLayoutProps = {
   onStartJeopardy: () => void;
   onStartQuiz: () => void;
   onFinish: () => void;
+  roster: RosterStudent[];
 };
 
 function PresentSlidesLayout({
@@ -258,6 +274,7 @@ function PresentSlidesLayout({
   onStartJeopardy,
   onStartQuiz,
   onFinish,
+  roster,
 }: PresentSlidesLayoutProps) {
   const slide = slides[currentSlide];
   const slideThemeParsed =
@@ -265,6 +282,7 @@ function PresentSlidesLayout({
   const tightenSlideChrome = Boolean(slideThemeParsed);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showRoster, setShowRoster] = useState(false);
 
   const syncFullscreen = useCallback(() => {
     const el = containerRef.current;
@@ -370,7 +388,7 @@ function PresentSlidesLayout({
     >
       {showChrome && (
       <div className="bg-white border-b border-gray-200 px-4 py-3 shrink-0">
-        <div className="max-w-[100rem] mx-auto flex items-center justify-between gap-3">
+        <div className="max-w-400 mx-auto flex items-center justify-between gap-3">
           <div className="min-w-0">
             <h1 className="text-lg font-semibold text-gray-900 truncate">{topic.title}</h1>
             <p className="text-sm text-gray-600">
@@ -378,6 +396,19 @@ function PresentSlidesLayout({
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
+            {roster.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowRoster((v) => !v)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
+                  showRoster
+                    ? "bg-teal-600 text-white border-teal-700"
+                    : "bg-teal-50 text-teal-700 border-teal-300 hover:bg-teal-100"
+                }`}
+              >
+                👥 {roster.length} student{roster.length !== 1 ? "s" : ""}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => void togglePresentationFullscreen()}
@@ -415,6 +446,28 @@ function PresentSlidesLayout({
             )}
           </div>
         </div>
+        {/* Class roster panel */}
+        {showRoster && roster.length > 0 && (
+          <div className="max-w-400 mx-auto mt-3 pt-3 border-t border-gray-100">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Class Roster</p>
+            <div className="flex flex-wrap gap-2">
+              {roster.map((s) => {
+                const stars = s.stars.reduce((sum, st) => sum + st.points, 0);
+                return (
+                  <span
+                    key={s.id}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-teal-50 text-teal-800 border border-teal-200"
+                  >
+                    {s.firstName} {s.lastName}
+                    {stars > 0 && (
+                      <span className="text-yellow-500 text-xs">{"⭐".repeat(Math.min(stars, 3))}</span>
+                    )}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
       )}
 
@@ -434,7 +487,7 @@ function PresentSlidesLayout({
                 type="button"
                 id={`slide-outline-mobile-${i}`}
                 onClick={() => setCurrentSlide(i)}
-                className={`snap-start shrink-0 w-[9.5rem] text-left rounded-xl border px-2.5 py-2 transition-all ${
+                className={`snap-start shrink-0 w-38 text-left rounded-xl border px-2.5 py-2 transition-all ${
                   active
                     ? "border-indigo-600 bg-white shadow-md ring-2 ring-indigo-500/30"
                     : "border-gray-200 bg-white/70 hover:bg-white hover:border-indigo-300"
@@ -460,7 +513,7 @@ function PresentSlidesLayout({
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {showChrome && (
         <aside
-          className="hidden lg:flex w-72 xl:w-80 flex-col shrink-0 border-r border-gray-200 bg-gradient-to-b from-gray-100/80 to-gray-50"
+          className="hidden lg:flex w-72 xl:w-80 flex-col shrink-0 border-r border-gray-200 bg-linear-to-b from-gray-100/80 to-gray-50"
           aria-label="Slide outline"
         >
           <div className="px-3 py-3 border-b border-gray-200 shrink-0">
@@ -552,7 +605,7 @@ function PresentSlidesLayout({
               <div
                 className={
                   showChrome
-                    ? `bg-white rounded-2xl shadow-lg border border-gray-200 min-h-[min(400px,50vh)] lg:min-h-[400px] ring-1 ring-gray-200 ${
+                    ? `bg-white rounded-2xl shadow-lg border border-gray-200 min-h-[min(400px,50vh)] lg:min-h-100 ring-1 ring-gray-200 ${
                         tightenSlideChrome ? "p-2 sm:p-4" : "p-6 md:p-12"
                       }`
                     : `bg-white rounded-2xl shadow-2xl ring-1 ring-white/10 max-h-[min(88vh,920px)] overflow-y-auto ${

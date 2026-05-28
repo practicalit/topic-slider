@@ -17,16 +17,16 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   if (!ctx.ok) return ctx.res;
 
   const { id } = await params;
-  const updated = await prisma.student.updateMany({
+
+  // Remove enrollment from this class only
+  const deleted = await prisma.studentClassEnrollment.deleteMany({
     where: {
-      id,
-      tenantId: ctx.tenantId,
+      studentId: id,
       classId: ctx.classId,
-      deletedAt: null,
+      tenantId: ctx.tenantId,
     },
-    data: { deletedAt: new Date() },
   });
-  if (updated.count === 0) {
+  if (deleted.count === 0) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   return NextResponse.json({ success: true });

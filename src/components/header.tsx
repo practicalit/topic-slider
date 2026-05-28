@@ -145,7 +145,6 @@ export function Header({ tenantSlug: tenantSlugOverride }: HeaderProps) {
   const links = [
     { href: "/dashboard", label: "Home" },
     { href: "/context", label: "Class & subject" },
-    { href: "/present", label: "Present" },
     { href: "/students", label: "Students" },
     { href: "/leaderboard", label: "Leaderboard" },
     ...(isAdmin ? [{ href: "/admin", label: "Admin" }] : []),
@@ -163,10 +162,10 @@ export function Header({ tenantSlug: tenantSlugOverride }: HeaderProps) {
     }`;
 
   return (
-    <header className="sticky top-0 z-50 border-b border-white/15 bg-[#5d39f4] shadow-sm backdrop-blur-sm supports-[backdrop-filter]:bg-[#5d39f4]">
+    <header className="sticky top-0 z-50 border-b border-white/15 bg-[#5d39f4] shadow-sm backdrop-blur-sm supports-backdrop-filter:bg-[#5d39f4]">
       <div className="mx-auto max-w-7xl px-3 sm:px-4 lg:px-6">
         {/* One slim row (sm+): logo, inline nav, context (xl+ only — at lg the pill sits below so nav links are not clipped), user + sign out */}
-        <div className="flex min-h-[2.5rem] items-center gap-2 py-1.5 sm:min-h-[2.75rem] sm:gap-3 sm:py-2">
+        <div className="flex min-h-10 items-center gap-2 py-1.5 sm:min-h-11 sm:gap-3 sm:py-2">
           <div className="flex min-w-0 shrink-0 items-center gap-1.5 sm:gap-2">
             <Link
               href="/dashboard"
@@ -181,7 +180,7 @@ export function Header({ tenantSlug: tenantSlugOverride }: HeaderProps) {
             </Link>
             {badgeLabel ? (
               <span
-                className="hidden max-w-[4.5rem] truncate rounded-full bg-white/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white sm:inline-flex md:max-w-[6.5rem] md:text-[10px]"
+                className="hidden max-w-18 truncate rounded-full bg-white/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white sm:inline-flex md:max-w-26 md:text-[10px]"
                 title={`Site key: ${badgeLabel}`}
               >
                 {badgeLabel}
@@ -211,7 +210,7 @@ export function Header({ tenantSlug: tenantSlugOverride }: HeaderProps) {
           </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-2.5">
-            <span className="hidden max-w-[10rem] truncate text-xs text-white sm:inline md:max-w-[13rem]">
+            <span className="hidden max-w-40 truncate text-xs text-white sm:inline md:max-w-52">
               <span className="font-semibold">{session.user.name || "Signed in"}</span>
               <span className="text-white/75"> ({roleLabel})</span>
             </span>

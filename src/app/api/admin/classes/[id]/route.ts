@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
   countActiveStudentsForClass,
-  countTopicsForClass,
 } from "@/lib/archive";
 import { requireAdmin, requireAuth } from "@/lib/scope";
 
@@ -25,25 +24,12 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const [topicCount, studentCount] = await Promise.all([
-    countTopicsForClass(tenantId, id),
-    countActiveStudentsForClass(id),
-  ]);
-  if (topicCount > 0) {
-    return NextResponse.json(
-      {
-        error: "Cannot archive a class that still has topics. Delete those topics first.",
-        code: "HAS_TOPICS",
-        topicCount,
-      },
-      { status: 409 }
-    );
-  }
+  const studentCount = await countActiveStudentsForClass(id);
   if (studentCount > 0) {
     return NextResponse.json(
       {
         error:
-          "Cannot archive a class that still has students. Archive students or move them first.",
+          "Cannot archive a class that still has students enrolled. Remove students from the class first.",
         code: "HAS_STUDENTS",
         studentCount,
       },
