@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
     action: "TOPIC_CREATE",
     entityType: "Topic",
     entityId: topic.id,
-    summary: `Created topic "${topic.title}"`,
+    summary: `Created topic \u201c${topic.title}\u201d`,
     metadata: { title: topic.title, subjectId },
   });
 

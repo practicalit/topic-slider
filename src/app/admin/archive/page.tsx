@@ -19,8 +19,7 @@ type StudentRow = {
   firstName: string;
   lastName: string;
   deletedAt: string;
-  classId: string;
-  schoolClass: { code: string; deletedAt: string | null };
+  enrollments: { class: { code: string; deletedAt: string | null } }[];
 };
 
 type ArchivePayload = {
@@ -336,15 +335,21 @@ export default function AdminArchivePage() {
                           <span className="text-gray-900 font-medium">
                             {st.firstName} {st.lastName}
                           </span>
-                          <span className="text-gray-600 ml-2">
-                            Class {st.schoolClass.code}
-                            {st.schoolClass.deletedAt ? " (class archived)" : ""}
-                          </span>
+                          {st.enrollments.length === 0 ? (
+                            <span className="text-gray-400 ml-2 text-xs">No class</span>
+                          ) : (
+                            st.enrollments.map((e, i) => (
+                              <span key={i} className="text-gray-600 ml-2">
+                                Class {e.class.code}
+                                {e.class.deletedAt ? " (archived)" : ""}
+                              </span>
+                            ))
+                          )}
                         </div>
                         <button
                           type="button"
                           onClick={() => restoreStudent(st.id)}
-                          disabled={!!st.schoolClass.deletedAt}
+                          disabled={st.enrollments.length > 0 && st.enrollments.every((e) => !!e.class.deletedAt)}
                           className="text-indigo-600 bg-indigo-50 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed px-2 py-1 rounded text-xs font-medium border border-indigo-200 self-start sm:self-auto"
                         >
                           Restore

@@ -84,6 +84,7 @@ export default function AdminStudentsPage() {
   // Debounced search for existing students not in this class
   useEffect(() => {
     if (!searchQuery.trim() || !classId) {
+      if (searchTimeout.current) clearTimeout(searchTimeout.current);
       setSearchResults([]);
       setSearchLoading(false);
       return;
@@ -251,7 +252,7 @@ export default function AdminStudentsPage() {
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
             <h2 className="text-base font-semibold text-gray-900 mb-1">Enroll an existing student</h2>
             <p className="text-xs text-gray-500 mb-4">
-              Search for a student who already exists in your school but isn't yet in{" "}
+              Search for a student who already exists in your school but isn&apos;t yet in{" "}
               <span className="font-medium text-gray-700">{classLabel}</span>.
             </p>
 
